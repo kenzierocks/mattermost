@@ -48,7 +48,7 @@ def index():
     in_text = request.form['text'].strip()
     in_parts = in_text.split(' ')
     if len(in_parts) == 1 and in_parts[0][-2:] == '++':
-        entry = in_parts[0][:-2]
+        entry = in_parts[0][:-2].lstrip('@')
         if not entry.isalnum():
             return msg(entry + ' is not a valid entry identifier.')
         ident = aliases.resolve_to_identifier(entry)
