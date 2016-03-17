@@ -25,6 +25,15 @@ def get_entry(ident):
         return 0
     assert len(data) == 1, "unexpected data for " + entry
     return data[0]['count']
+def get_largest_entry():
+    Entry = Query()
+    data = db.search(Entry.count > 0)
+    max_score = None
+    for e in data:
+        e_count = e['count']
+        if e_count > (max_score['count'] if max_score else 0):
+            max_score = e
+    return max_score
 def increment_entry(ident):
     Entry = Query()
     cond = Entry.ident == ident
@@ -72,6 +81,9 @@ def handle_command(parts):
         if r:
             return msg(r)
         return no_msg()
+    if parts[0] == 'winner':
+        top = get_largest_entry()
+        return msg('Current top score: {} with {}'.format(top['ident'], top['count']))
     return msg("Unknown ++ command " + parts[0])
 
 
