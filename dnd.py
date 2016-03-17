@@ -41,6 +41,14 @@ def increment_entry(ident):
         db.insert({'ident': ident, 'count': 1})
         return
     db.update(increment('count'), cond)
+def merge_ident(i_from, i_to):
+    Ident = Query()
+    if db.contains(Ident.ident == i_from) and db.contains(Ident.ident == i_to):
+        i_from_data = db.get(Ident.ident == i_from)
+        def add_score(entry):
+            entry['count'] += i_from_data['count']
+        db.update(add_score, Ident.ident == i_to)
+    return aliases.merge_ident(i_from, i_to)
 
 def msg(text):
     return jsonify(username=BOT_NAME, text=text)
@@ -78,6 +86,15 @@ def handle_command(parts):
         ident = parts[1]
         alias = parts[2]
         r = aliases.add_alias(ident, alias)
+        if r:
+            return msg(r)
+        return no_msg()
+    if parts[0] == 'merge_idents' and is_admin:
+        if len(parts) < 3:
+            return msg("Need 2 args: [ident_from, ident_to]")
+        i_from = parts[1]
+        i_to = parts[2]
+        r = merge_ident(i_from, i_to)
         if r:
             return msg(r)
         return no_msg()

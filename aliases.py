@@ -28,3 +28,15 @@ def add_alias(ident, alias):
         entry['aliases'].append({"name": alias})
     _db.update(transform_add_alias, ident_query)
     return "Added alias {} to {}".format(alias, ident)
+
+def merge_ident(i_from, i_to):
+    Ident = Query()
+    if not _db.contains(Ident.ident == i_from) or not _db.contains(Ident.ident == i_to):
+        return "One of the idents does not exist: {} or {}".format(i_from, i_to)
+    ident_from_data = _db.get(Ident.ident == i_from)
+    def transform_add_aliases(entry):
+        entry['aliases'] += ident_from_data['aliases']
+    _db.update(transform_add_aliases, Ident.ident == i_to)
+    _db.remove(Ident.ident == i_from)
+    return "Merged {} into {}".format(i_from, i_to)
+
