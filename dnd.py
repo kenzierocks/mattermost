@@ -50,6 +50,13 @@ def merge_ident(i_from, i_to):
         db.update(add_score, Ident.ident == i_to)
     return aliases.merge_ident(i_from, i_to)
 
+def ident_or_by_name(name):
+    if name.startswith('ident!'):
+        return name
+    if name[0] == '@':
+        name = name[1:]
+    return aliases.resolve_to_identifier(name)
+
 def msg(text):
     return jsonify(username=BOT_NAME, text=text)
 def no_msg():
@@ -63,18 +70,23 @@ def index():
         thegoodprint('Denying token', request.form['token'])
         abort(401)
     in_text = request.form['text'].strip()
-    in_parts = in_text.split(' ')
-    if len(in_parts) == 1 and in_parts[0][-2:] == '++':
-        entry = in_parts[0][:-2].lstrip('@')
-        if not entry.isalnum():
-            return msg(entry + ' is not a valid entry identifier.')
-        ident = aliases.resolve_to_identifier(entry)
-        increment_entry(ident)
-        return msg(entry + " (" + ident + ") now has a score of " + str(get_entry(ident)))
-    elif in_parts[0].startswith('++'):
-        # PlusPlus commands!
-        in_parts[0] = in_parts[0][2:]
-        return handle_command(in_parts)
+    try:
+        in_parts = in_text.split(' ')
+        if len(in_parts) == 1 and in_parts[0][-2:] == '++':
+            entry = in_parts[0][:-2].lstrip('@')
+            if not (entry.isalnum() or entry.startswith('ident!')):
+                return msg(entry + ' is not a valid entry identifier.')
+            ident = ident_or_by_name(entry)
+            increment_entry(ident)
+            return msg(entry + " (" + ident + ") now has a score of " + str(get_entry(ident)))
+        elif in_parts[0].startswith('++'):
+            # PlusPlus commands!
+            in_parts[0] = in_parts[0][2:]
+            return handle_command(in_parts)
+    except:
+        # Be quiet if it didn't look like us
+        if '++' in in_text:
+            return msg("An unknown error occurred processing your input")
     return no_msg()
 
 
@@ -101,6 +113,11 @@ def handle_command(parts):
     if parts[0] == 'winner':
         top = get_largest_entry()
         return msg('Current top score: {} with {}'.format(top['ident'], top['count']))
+    if parts[0] == 'get':
+        if len(parts) < 2:
+            return msg("Need 1 arg: [name]")
+        count = get_entry(ident_or_by_name(parts[1]))
+        return msg("{}'s score is {}".format(parts[1], count))
     return msg("Unknown ++ command " + parts[0])
 
 
