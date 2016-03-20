@@ -25,6 +25,8 @@ def get_entry(ident):
         return 0
     assert len(data) == 1, "unexpected data for " + entry
     return data[0]['count']
+def get_entries():
+    return db.all()
 def get_largest_entry():
     Entry = Query()
     data = db.search(Entry.count > 0)
@@ -83,7 +85,10 @@ def index():
             # PlusPlus commands!
             in_parts[0] = in_parts[0][2:]
             return handle_command(in_parts)
-    except:
+    except Exception as e:
+        thegoodprint('err....', e)
+        import traceback
+        traceback.print_exc()
         # Be quiet if it didn't look like us
         if '++' in in_text:
             return msg("An unknown error occurred processing your input")
@@ -137,6 +142,15 @@ def c_winner():
 def c_get(name):
     count = get_entry(ident_or_by_name(name))
     return "{}'s score is {}".format(name, count)
+
+@command('list', 'Lists all the scores', [])
+def c_list():
+    l = get_entries()
+    s = '|Ident|Score|\n'
+    s += '|----|-----|\n'
+    for e in sorted(l, key=lambda f: -f['count']):
+        s += ("|{}|{}|\n".format(e['ident'], e['count']))
+    return s
 
 @command('help', 'Lists help for all or a specified command.', None)
 def c_help(args):
