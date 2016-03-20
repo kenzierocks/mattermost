@@ -50,6 +50,7 @@ def merge_ident(i_from, i_to):
         def add_score(entry):
             entry['count'] += i_from_data['count']
         db.update(add_score, Ident.ident == i_to)
+        db.remove(Ident.ident == i_from)
     return aliases.merge_ident(i_from, i_to)
 
 def ident_or_by_name(name):
@@ -166,6 +167,17 @@ def c_help(args):
     if cmd not in command_map:
         return "The command {} does not exist.".format(cmd)
     return "```\n++{}: {}\n```".format(cmd, command_map[cmd]['desc'])
+
+@command('remove_ident', 'Removes an ident entirely', ['ident or alias'], admin=True)
+def c_remove_alias(ident):
+    ident = ident_or_by_name(ident)
+    ident_query = Query().ident == ident
+    s = ''
+    if db.contains(ident_query):
+        db.remove(ident_query)
+        s += "Removed scores for {}.\n".format(ident)
+    s += aliases.remove_ident(ident)
+    return s
 
 def handle_command(parts):
     is_admin = admin.is_admin(request.form['user_id'])

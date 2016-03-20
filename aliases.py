@@ -20,6 +20,13 @@ def resolve_to_identifier(pot_alias):
     _db.insert({"ident": ident, "aliases": [{"name": pot_alias}]})
     return ident
 
+def remove_ident(ident):
+    ident_query = Query().ident == ident
+    if not _db.contains(ident_query):
+        return "No such identifier " + ident
+    _db.remove(ident_query)
+    return "Zapped {} from existence.".format(ident)
+
 def add_alias(ident, alias):
     ident_query = Query().ident == ident
     if not _db.contains(ident_query):
