@@ -94,12 +94,23 @@ def index():
             return msg("An unknown error occurred processing your input")
     return no_msg()
 
+def filter_html(x):
+    return x.replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+
 @app.route('/listcmd')
 def listcmd():
     l = []
     for k, v in command_map.items():
         l.append("++{}: {}".format(k, v['desc']))
-    return '<br>'.join(x.replace('<', '&lt;').replace('>', '&gt;') for x in l)
+    return filter_html('\n'.join(l))
+
+@app.route('/listscores')
+def listscore():
+    l = get_entries()
+    s = ''
+    for e in sorted(l, key=lambda f: -f['count']):
+        s += ("{} has a score of {}\n".format(e['ident'], e['count']))
+    return filter_html(s)
 
 command_map = dict()
 
@@ -145,12 +156,7 @@ def c_get(name):
 
 @command('list', 'Lists all the scores', [])
 def c_list():
-    l = get_entries()
-    s = '|Ident|Score|\n'
-    s += '|----|-----|\n'
-    for e in sorted(l, key=lambda f: -f['count']):
-        s += ("|{}|{}|\n".format(e['ident'], e['count']))
-    return s
+    return 'Visit {} for the score listings.'.format(request.url_root + 'listscores')
 
 @command('help', 'Lists help for all or a specified command.', None)
 def c_help(args):
