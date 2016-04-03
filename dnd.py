@@ -36,13 +36,14 @@ def get_largest_entry():
         if e_count > (max_score['count'] if max_score else 0):
             max_score = e
     return max_score
-def increment_entry(ident):
+def change_entry(ident, amount):
     Entry = Query()
     cond = Entry.ident == ident
     if not db.contains(cond):
-        db.insert({'ident': ident, 'count': 1})
-        return
-    db.update(increment('count'), cond)
+        db.insert({'ident': ident, 'count': 0})
+    def change(entry):
+        entry['count'] += amount
+    db.update(change, cond)
 def merge_ident(i_from, i_to):
     Ident = Query()
     if db.contains(Ident.ident == i_from) and db.contains(Ident.ident == i_to):
@@ -67,21 +68,30 @@ def no_msg():
 def thegoodprint(*args):
     print(*args, file=sys.stderr)
 
+def change_score(entry, amount):
+    if not (entry.isalnum() or entry.startswith('ident!')):
+        return entry + ' is not a valid entry identifier.'
+    ident = ident_or_by_name(entry)
+    change_entry(ident, amount)
+    return "{} ({}) now has score of {}.".format(entry, ident, get_entry(ident))
+
 @app.route("/", methods=("GET", "POST"))
 def index():
     if request.form['token'] not in MY_SECRET_TOKENS:
         thegoodprint('Denying token', request.form['token'])
         abort(401)
-    in_text = request.form['text'].strip()
+    in_text = request.form['text'].strip().lower()
     try:
         in_parts = in_text.split(' ')
-        if len(in_parts) == 1 and in_parts[0][-2:] == '++':
+        if len(in_parts) == 1 and (in_parts[0][-2:] in ('++', '--')):
             entry = in_parts[0][:-2].lstrip('@')
-            if not (entry.isalnum() or entry.startswith('ident!')):
-                return msg(entry + ' is not a valid entry identifier.')
-            ident = ident_or_by_name(entry)
-            increment_entry(ident)
-            return msg(entry + " (" + ident + ") now has a score of " + str(get_entry(ident)))
+            cmd = in_parts[0][-2:]
+            data = 'Cannot handle ' + cmd
+            if cmd == '++':
+                data = change_score(entry, 1)
+            elif cmd == '--':
+                data = change_score(entry, -1)
+            return msg(data)
         elif in_parts[0].startswith('++'):
             # PlusPlus commands!
             in_parts[0] = in_parts[0][2:]
@@ -178,6 +188,10 @@ def c_remove_alias(ident):
         s += "Removed scores for {}.\n".format(ident)
     s += aliases.remove_ident(ident)
     return s
+
+@command('source', 'Retrieve the URL for source', [])
+def c_source():
+    return 'https://github.com/kenzierocks/mattermost'
 
 def handle_command(parts):
     is_admin = admin.is_admin(request.form['user_id'])
