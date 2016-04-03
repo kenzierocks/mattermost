@@ -82,20 +82,13 @@ def index():
         abort(401)
     in_text = request.form['text'].strip().lower()
     try:
-        in_parts = in_text.split(' ')
-        if len(in_parts) == 1 and (in_parts[0][-2:] in ('++', '--')):
-            entry = in_parts[0][:-2].lstrip('@')
-            cmd = in_parts[0][-2:]
-            data = 'Cannot handle ' + cmd
-            if cmd == '++':
-                data = change_score(entry, 1)
-            elif cmd == '--':
-                data = change_score(entry, -1)
-            return msg(data)
-        elif in_parts[0].startswith('++'):
-            # PlusPlus commands!
-            in_parts[0] = in_parts[0][2:]
-            return handle_command(in_parts)
+        linestosend = []
+        for line in in_text.split('\n'):
+            v = handle_in_msg(line)
+            if v:
+                linestosend.append(v)
+        if linestosend:
+            return msg('\n'.join(linestosend))
     except Exception as e:
         thegoodprint('err....', e)
         import traceback
@@ -104,6 +97,22 @@ def index():
         if '++' in in_text:
             return msg("An unknown error occurred processing your input")
     return no_msg()
+
+def handle_in_msg(in_text):
+    in_parts = in_text.split(' ')
+    if len(in_parts) == 1 and (in_parts[0][-2:] in ('++', '--')):
+        entry = in_parts[0][:-2].lstrip('@')
+        cmd = in_parts[0][-2:]
+        data = 'Cannot handle ' + cmd
+        if cmd == '++':
+            data = change_score(entry, 1)
+        elif cmd == '--':
+            data = change_score(entry, -1)
+        return data
+    elif in_parts[0].startswith('++'):
+        # PlusPlus commands!
+        in_parts[0] = in_parts[0][2:]
+        return handle_command(in_parts)
 
 def filter_html(x):
     return x.replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
@@ -209,11 +218,9 @@ def handle_command(parts):
         else:
             r = cmd_data['func'](*args)
         if r:
-            if isinstance(r, str):
-                return msg(r)
             return r
-        return no_msg()
-    return msg("Unknown ++ command " + parts[0])
+        return None
+    return "Unknown ++ command " + parts[0]
 
 
 if not app.debug:
