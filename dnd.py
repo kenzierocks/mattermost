@@ -46,13 +46,24 @@ def change_entry(ident, amount):
     db.update(change, cond)
 def merge_ident(i_from, i_to):
     Ident = Query()
-    if db.contains(Ident.ident == i_from) and db.contains(Ident.ident == i_to):
+    from_exists = db.contains(Ident.ident == i_from)
+    to_exists = db.contains(Ident.ident == i_to)
+    if from_exists and to_exists:
         i_from_data = db.get(Ident.ident == i_from)
         def add_score(entry):
             entry['count'] += i_from_data['count']
         db.update(add_score, Ident.ident == i_to)
         db.remove(Ident.ident == i_from)
-    return aliases.merge_ident(i_from, i_to)
+        return aliases.merge_ident(i_from, i_to)
+    else:
+        s = ''
+        if not from_exists:
+            s += i_from
+        if not to_exists:
+            if s:
+                s += ', '
+            s += i_to
+        return "Couldn't find {} in the DB.".format(s)
 
 def ident_or_by_name(name):
     if name.startswith('ident!'):
@@ -68,12 +79,15 @@ def no_msg():
 def thegoodprint(*args):
     print(*args, file=sys.stderr)
 
+def emoji_for_dutcher(entry):
+    return entry[0] == ':' and entry[-1] == ':' and entry[1:-1].isalnum()
+
 def change_score(entry, amount):
-    if not (entry.isalnum() or entry.startswith('ident!')):
+    if not (entry.isalnum() or entry.startswith('ident!') or emoji_for_dutcher(entry)):
         return entry + ' is not a valid entry identifier.'
     ident = ident_or_by_name(entry)
     change_entry(ident, amount)
-    return "{} ({}) now has score of {}.".format(entry, ident, get_entry(ident))
+    return "{} now has score of {}.".format(entry, get_entry(ident))
 
 @app.route("/", methods=("GET", "POST"))
 def index():
@@ -160,9 +174,9 @@ def args_to_string(args):
 def c_add_alias(ident, alias):
     return aliases.add_alias(ident, alias)
 
-@command('merge_idents', 'Merges ident_from into ident_to.', ['ident_from', 'ident_to'], True)
-def c_merge_idents(ident_from, ident_to):
-    return merge_ident(i_from, ident_to)
+@command('merge_idents', 'Merges `from` into `to`.', ['ident or alias from', 'ident or alias to'], True)
+def c_merge_idents(fr, to):
+    return merge_ident(ident_or_by_name(fr), ident_or_by_name(to))
 
 @command('winner', 'Finds the user with the most points.', [])
 def c_winner():
@@ -202,6 +216,11 @@ def c_remove_alias(ident):
 def c_source():
     return 'https://github.com/kenzierocks/mattermost'
 
+@command('get_ident', 'Retrieve the ident for an alias', ['alias'])
+def c_get_ident(name):
+    ident = ident_or_by_name(name)
+    return ident
+
 def handle_command(parts):
     is_admin = admin.is_admin(request.form['user_id'])
     cmd_name = parts[0]
@@ -232,4 +251,3 @@ if not app.debug:
 
 if __name__ == '__main__':
     app.run('0.0.0.0', 0x1F11, debug=True) # 7953
-
