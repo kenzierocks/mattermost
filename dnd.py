@@ -129,7 +129,11 @@ def handle_in_msg(in_text):
         return handle_command(in_parts)
 
 def filter_html(x):
-    return x.replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+    return (x.replace('<', '&lt;')
+                .replace('>', '&gt;')
+                .replace('\n', '<br>')
+                .replace('\x00&lt;', '<')
+                .replace('\x00&gt;', '>'))
 
 @app.route('/listcmd')
 def listcmd():
@@ -141,9 +145,18 @@ def listcmd():
 @app.route('/listscores')
 def listscore():
     l = get_entries()
-    s = ''
+    s = """
+    <table style="margin: 0 auto">
+        <tr>
+            <th>Identifier</th>
+            <th>Score</th>
+        </tr>
+    """.replace('<', '\x00<').replace('>', '\x00>').replace('\n', '')
     for e in sorted(l, key=lambda f: -f['count']):
-        s += ("{} has a score of {}\n".format(e['ident'], e['count']))
+        s += ("<tr><td>{}</td><td align=\"right\">{}</td></tr>"
+              .replace('<', '\x00<').replace('>', '\x00>')
+              .format(e['ident'], e['count']))
+    s += "</table>".replace('<', '\x00<').replace('>', '\x00>')
     return filter_html(s)
 
 command_map = dict()
