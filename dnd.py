@@ -44,6 +44,15 @@ def change_entry(ident, amount):
     def change(entry):
         entry['count'] += amount
     db.update(change, cond)
+def set_entry(ident, amount):
+    Entry = Query()
+    cond = Entry.ident == ident
+    if not db.contains(cond):
+        db.insert({'ident': ident, 'count': amount})
+    else:
+        def f(e):
+            e['count'] = amount
+        db.update(f, cond)
 def merge_ident(i_from, i_to):
     Ident = Query()
     from_exists = db.contains(Ident.ident == i_from)
@@ -87,6 +96,13 @@ def change_score(entry, amount):
         return entry + ' is not a valid entry identifier.'
     ident = ident_or_by_name(entry)
     change_entry(ident, amount)
+    return "{} now has score of {}.".format(entry, get_entry(ident))
+
+def set_score(entry, amount):
+    if not (entry.isalnum() or entry.startswith('ident!') or emoji_for_dutcher(entry)):
+        return entry + ' is not a valid entry identifier.'
+    ident = ident_or_by_name(entry)
+    set_entry(ident, amount)
     return "{} now has score of {}.".format(entry, get_entry(ident))
 
 @app.route("/", methods=("GET", "POST"))
@@ -142,20 +158,41 @@ def listcmd():
         l.append("++{}: {}".format(k, v['desc']))
     return filter_html('\n'.join(l))
 
+def htmlEsc(s, newlines=False):
+    if newlines:
+        s = s.replace('\n', '')
+    return s.replace('<', '\x00<').replace('>', '\x00>')
 @app.route('/listscores')
 def listscore():
     l = get_entries()
-    s = """
-    <table style="margin: 0 auto">
+    s = htmlEsc("""
+    <head>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    </head>
+    <body>
+    <table style="margin: 0 auto; width: inherit" class="table table-striped">
         <tr>
             <th>Identifier</th>
             <th>Score</th>
         </tr>
-    """.replace('<', '\x00<').replace('>', '\x00>').replace('\n', '')
+    </body>
+    """, True)
+    mn = min(f['count'] for f in l)
+    mx = max(f['count'] for f in l)
+    if mn == mx:
+        s += htmlEsc("<h1>Warning: min == max, no scores?</h1>")
     for e in sorted(l, key=lambda f: -f['count']):
-        s += ("<tr><td>{}</td><td align=\"right\">{}</td></tr>"
-              .replace('<', '\x00<').replace('>', '\x00>')
-              .format(e['ident'], e['count']))
+        tmpl = """
+        <div class="progress" style="margin-bottom: 0">
+            <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="{value}" aria-valuemin="{min}" aria-valuemax="{max}" style="width: {percent}%;">
+            </div>
+        </div>
+        """.replace('\n', '')
+        v = e['count']
+        pcent = 0 if mx == mn else int((v-mn)/(mx-mn) * 100)
+        s += (htmlEsc("<tr><td>{}</td><td align=\"right\">{}" + tmpl + "</td></tr>"
+              .replace('<', '\x00<').replace('>', '\x00>'))
+              .format(e['ident'].replace('ident!', ''), e['count'], value=v, min=mn, max=mx, percent=pcent))
     s += "</table>".replace('<', '\x00<').replace('>', '\x00>')
     return filter_html(s)
 
@@ -190,6 +227,14 @@ def c_add_alias(ident, alias):
 @command('merge_idents', 'Merges `from` into `to`.', ['ident or alias from', 'ident or alias to'], True)
 def c_merge_idents(fr, to):
     return merge_ident(ident_or_by_name(fr), ident_or_by_name(to))
+
+@command('set_score', 'Sets the score of `ident` to `score`.', ['ident', 'score'], True)
+def c_set_score(to, score):
+    try:
+        score = int(score)
+    except ValueError:
+        return score + " is not a valid score."
+    return set_score(to, score)
 
 @command('winner', 'Finds the user with the most points.', [])
 def c_winner():
